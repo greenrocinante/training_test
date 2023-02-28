@@ -5,3 +5,5 @@ learning objectives:
 - demonstrate how to create a repository in github
 - practice making a commit
 - how to access repository in R studio
+
+more coming soon
