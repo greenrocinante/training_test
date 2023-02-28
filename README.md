@@ -7,3 +7,9 @@ learning objectives:
 - how to access repository in R studio
 
 more coming soon
+
+## learning objectives
+
+- collaborate and share
+- version control
+- have backups
