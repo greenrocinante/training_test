@@ -1,0 +1,251 @@
+## Load Libraries
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(readr)
+```
+
+## Load Data
+
+```{r}
+# get data from this url 
+# be careful different command on windows than here!
+
+catch_original <- read.csv("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.302.1")
+
+```
+
+## Clean Data 
+
+```{r}
+
+#just removing the most obvious unhelpful columns
+#remove the all and notes region code columns from the catch original data frame
+# select is a filter
+
+catch_data <- catch_original %>%
+  select(Region, Year, Chinook, Sockeye, Coho, Pink, Chum)
+
+#r is assuming that its from the deploy function the others dont have it
+#the program is supposed to KEEP just these columns
+#alt shift c for commenting out whole chunks of code
+
+#instead we can select which columns to DELTETE
+#this does the same as the first command
+
+#catch_data <- catch_original %%
+#  select(-All, -NotesRegCode)
+
+head(catch_data)
+glimpse(catch_data) 
+
+#glimpse i dont know what it does maybe also showing smth LOOKUP
+#head shows the tables here
+```
+
+## Clean Data w more details
+
+```{r}
+#were doing different steps, change data type of a value; find a value; substitute a value
+#then bring all the stuff together
+
+#Mutate chinook from character to numeric
+catch_clean <- catch_data %>%
+  mutate(Chinook = as.numeric(Chinook))
+
+#search from the na value
+i <- which(is.na(catch_clean$Chinook))
+i
+
+#located our na value, its a lowercase l
+catch_data[i, ]
+
+#cleaning the lowercase i and set it to 1
+#we use an if-else-loop for that
+#the column is set as an integer not a string
+
+catch_clean <- catch_data %>%
+  mutate(Chinook = if_else(Chinook == "I", "1", Chinook)) %>%
+  mutate(Chinook = as.integer(Chinook))
+
+glimpse(catch_clean)
+```
+
+## change shape of data using pivot longer and pivot wider
+```{r}
+
+#pivot longer practice
+#we turn a set of column name, like here species, this information into ONE column, where species names get repeated several times
+# we get another column where we get the actual names that are in these columns
+# we create TWO NEW columns
+# the column of names that used to be column names
+
+catch_long <- catch_clean %>%
+  pivot_longer(cols = -c(Region, Year), names_to = "species", values_to = catch)
+# names_to == values from within these columns, into a new column
+# in the case above a column named "catch"
+View(catch_long)
+
+#pivot wide practice
+
+catch_wide <- catch_long %>% 
+  pivot_wider(names_from = species, values_from = catch)
+head(catch_wide)
+
+```
+
+## practice renaming columns
+
+```{r}
+#dont actually rename accidentally the wrong column if you rename by position
+#NAME EXPLICITLY not by position
+catch_long <- catch_long %>%
+  rename(catch_thousands = catch)
+
+head(catch_long)
+```
+
+## Add columns w mutate function
+
+```{r}
+catch_long <- catch_long %>%
+  mutate(catch = catch_thousands * 1000) %>%
+  select(-catch_thousands) #remove catch_thousands
+
+head(catch_long)
+```
+
+## Practice using group_by and summarize!
+
+```{r}
+mean_region <- catch_long %>%
+  group_by(Region) %>%
+  summarise(catch_mean = mean(catch))
+
+head(mean_region)
+
+#summarize count by region
+#summarize can be spelled w z and s bc users all over world
+
+n_region <- catch_long %>%
+  group_by(Region) %>%
+  summarize(number_of_observations = n(), #number of rows in each group
+            total_catch = sum(catch)) 
+
+head(n_region)
+  
+```
+
+## Lesson on Filtering
+
+```{r}
+ALU_catch <- catch_long %>%
+  filter(Region == "ALU")
+head(ALU_catch)
+```
+
+## Arrange some rows. sad-woo
+
+```{r}
+mean_region_arrange <- catch_long %>%
+  group_by(Region) %>%
+  summarise(mean_catch = mean(catch))
+  arrange(mean_catch) #arrange it in ascending order
+  
+#how to arrange in descending order?
+#we can call descending function
+  
+  #arrange(desc(mean_catch))
+
+head(mean_region)
+head(mean_region_arrange)
+```
+
+## We're practicing our joins
+
+```{r}
+#loading in this data set byerly and so on
+region_defs <- read.csv("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.303.1") %>% 
+    select(code, mgmtArea) #we say straight away that we just want to keep code and management area data
+
+head(region_defs)
+```
+
+## Join our data
+
+```{r}
+catch_joined <- left_join(catch_long, region_defs, by = c("Region" = "code"))
+
+#we no longer have a code column, like in region defs (the last code chunk)
+#we still have a mngmt column
+
+head(catch_joined)
+```
+
+
+```{r}
+# We want to join the Region column in this code snippet
+#we create a new region defs
+#creating a new colum called region
+# the data is coming from code
+#formerly known mgmt area
+
+region_defs <- region_defs %>% 
+  rename(Region = code, Region_Name = mgmtArea)
+
+catch_joined <- left_join(catch_long, region_defs, by = c("Region"))
+#calling both columns you want to join as an argument 
+#Region column in both data sets, it makes sense to merge them together here
+
+head(catch_joined)
+
+
+```
+
+## Practice with seperate and unite
+
+```{r}
+
+#creates a new data frame first
+
+sites_df <- data.frame(site = c("HAW-101",
+                                "HAW-103",
+                                "OAH-320",
+                                "OAH-219",
+                                "MAI-039"))
+#but it looks so messy
+
+sites_df %>% 
+  separate(site, c("island", "site_number"), "-")
+
+#you want to create two columns called island and site number
+#i want to seperate that data by the hyphen character
+#so we have taken the info from above and have seperated it
+
+#how to unite them back together
+
+#there is a function named unite
+#unite and seperate can be used to get a better view on our data
+#so goal of unite and seperate is "better view on data"
+
+dates_df2 <- data.frame(year = c("1930",
+                                "1930",
+                                "1930"),
+                       month = c("12",
+                                "12",
+                                "12"),
+                       day = c("14",
+                               "15",
+                               "16"))
+#we create a data frame with year,month,day (just for practice i think it has nothing to do w the previous table)
+
+dates_df2 %>% 
+  unite(date, year, month, day, sep = "-")
+  mutate(date = as.Date(date))
+
+#new column date is created
+#it is composed w the values year, month, day
+#each column that was already there before is now seperated by a hyphen
+```
+
