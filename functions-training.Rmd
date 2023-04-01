@@ -1,0 +1,26 @@
+```{r}
+source("temp-conversions.R")
+source("ggplot-helpers.R")
+
+library(ggplot2)
+```
+
+#we have four functions now here
+
+```{r}
+airtemps <- seq(-100, 100, 10) #creates 20 values w increment of 10
+
+airtemps_c <- fahr_to_celsius(airtemps)
+  
+```
+
+```{r}
+temps_all <- convert_temps(airtemps)
+```
+
+```{r}
+ggplot(temps_all, mapping = aes(x = fahr, y = celsius, color = kelvin)) +
+  geom_point() +
+  custom_theme(base_size = 25)
+```
+

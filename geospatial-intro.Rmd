@@ -1,0 +1,25 @@
+---
+title: "geospatial-intro"
+output: html_document
+date: "2023-03-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(sf)
+library(ggmap)
+library(scales)
+library(leaflet)
+library(dplyr)
+```
+
+```{r}
+ak_regions <- read_sf("data/ak_regions_simp.shp")
+```
+
+```{r}
+plot(ak_regions)
+```

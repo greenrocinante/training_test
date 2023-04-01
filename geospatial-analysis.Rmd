@@ -1,0 +1,303 @@
+---
+title: "Geospatial"
+output: html_document
+date: "2023-03-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(sf)
+library(ggplot2)
+library(leaflet)
+library(scales)
+library(ggmap)
+library(dplyr)
+```
+## see the regions map
+
+with the spatial-temporal function 'sf' the data from ak_regions_simp.shp file is read
+then an object named 'ak_regions' is created
+'<-' is a shortcut for the 'assign()' function, use it for assignment
+'=' is similiar to '<-', use it to pass arguments (e.g. for a function)
+'plot()' command plots an object
+after calling the 'plot()' function the 'ak_regions' object is printed here
+there maps are printed from this data set: region_id, region, and mgmt_area.
+they all seem to have similiar outer (land area of alaska) and inner (some areas within the alaska region) boundaries, although filled with different colour filling
+
+```{r}
+ak_regions <- read_sf("data/ak_regions_simp.shp")
+
+plot(ak_regions)  
+```
+## sf objects in R what do i need to know??
+
+### some context: how sf relates to other libraries and how is their relationship
+
+sf is a package
+it can be used in a project through loading its library 'library(sf)'
+
+basically, sf encodes spatial *vector data*. it follows a common standard, established/formalized by the open geospatical consortium (ogc). the standard is called 'Simple Features'.
+
+the sf package brings together the power of three different libraries actually: 
+~~ GDAL,  which is a translator library for raster and vector geospatial data formats,
+~~ GEOS, an open-source library for computational geometry,
+~~ proj.4, a library that transforms geospatial coordinates from one coordinate reference system (CRS) to another.
+
+i said 'brings together' but what does this actually mean?
+the sf package 'binds' to these three libraries. 
+**binding** is a function in r, the command to call it is 'rbind()'. it takes the input data and the data that should be bounded as argument. it returns a combined vetor, a data frame, a matrix or other data type values. the return depends on the input.
+binding brings rows and/or columns from different data types, e.g. vectors, matrices, data frames together in a single new combines data type, e.g. a vector, matrix or data frame.
+
+the sf package binds to GDAL for reading and writing data, GEOS to perform geometrical operations and proj.4 to converse projections and transform dates.
+
+*note: since the sf package binds to these three libraries, i think the sf package may be dependent on these libraries and dependent on the dploy package, bc the binding function comes from the dploy package? *
+
+### skeleton of the sf package, whats going on, generally speaking
+
+it represents Simple Features. the Simple Features are represented as records in a data.frame or tibble. sf uses simple data strcutures, such as lists, matrices, vectors or a class that is called s3 (dunno what that is tho) to represent the Simple Features.
+when i want to use something from the package, like a method or a function, on spatial data, the syntax is **st_**. which is pretty straightforward. 'st' stands for 'spatial' and 'temporal'.
+
+### so what is actually in this package i wanna open now??
+
+three classes are used to represent the Simple Features. those are
+~~ **sf** a table (data.frame) with feature (record) attributes and feature (record) gemoetries,
+~~ **sfc** a list-column, containing the geometries for each feature (record)
+~~ **sfg** a feature geometry of an individual simple feature.
+
+the relationship between these classes is that the sf-class contains an sfc class. the sfc class is composed by an sfg-class.
+
+*note: can every sf class contain one or multiple sfc classes and can each sfc class be composed of one or more sfg class? if it is different (maybe depending on the input?) what are the conditions for which case?* 
+
+*note: apparently 'feature' and 'record' mean the same here?*
+
+### ok we gotta clear this up what actually is a feature??
+
+idea: a feature is like a thing, e.g. an object, in the real world. a house or an ocean. it can be composed of other features. a brick stone or a wat drop would be a feature too, then.
+a feature brings two kind descriptions, spatial and non-spatial. thus (a) a geometry, where exactly it is located, and (b) attributes specifying what other properties the feature has.
+e.g. a house as a feature. its geometry says it is in street number, having a cubic shape. other attributes are colour, height, number of windows.
+
+### there is clearly more to a spatial description of a feature i guess
+
+**points**
+
+all geometries are composed of points. 
+points, then again, are coordinates in a space with, 2, 3 or 4 dimensions.
+all points have the same dimensionality.
+x, y are longitude/latitude,
+z is altitude,
+sometimes m as a measurement dimension (rarely used tho).
+
+**geometry types**
+
+the most common Simple Feature geometry types are point, linestring, polygons, multipoints, multilinestrings, multilinepolygons and geometrycollections.
+each geometry type can also be an empty set. we can think of them as 'missing attrbute', 'null value' or 'empty list'.
+there are 10 more, less common geometry types.
+
+### what is an sf object and what can we do with it?
+
+it is a data set. it consists of subsets of features with attributes.
+typically we can read, manipulate and write sets of features and their respective geometries and attributes.
+
+### structure and organization of a Simple Feature
+
+we can look at the class of the object 'ak_regions' we created to understand whats in there and why its typical for a Simple Feature.
+Feature *attributes* are typically stored in a data.frame object (or tbl_df object, which is similiar apparently).
+Feature *geometries* are typically stored in a data.frame column. geometries are not single-valued tho. thats why they need a list-column. its length is equal to the number of records in the data.frame. each element holds the Simple Feature geometry of the feature.
+
+```{r}
+class(ak_regions)
+colnames(ak_regions)
+print(ak_regions[0:4], n=3) #in data set ak_regions columns 0-4, the first 3 features and their attribute values and geometry values are printed
+```
+
+## classes in an SF feature
+
+### sf objects
+
+we work with datasets, consisting of sets of features with attributes. those are put together with their geometries in a combined SF objects.
+the SF object of ak_regions include 13 observations of 4 variables: region_id, region, mgmt_area and geometry.
+the geometry is of type 'multipolygon' of length 13 (bc the initial data frame as 13 entries).
+
+
+## coordinate reference system
+
+we need it bc coordinates can only be placed when we have a reference system. there are different reference systems.
+e.g. spheroid (WGS 84),
+two-dimensional, projected / Cartesian (UTM Zone, Web Mercator),
+three-dimensional / two-dimensions and time
+with the command 'st_crs' we get the CRS of the input data as ouput. here it is WGS 84.
+
+```{r}
+st_crs(ak_regions)
+```
+
+```{r}
+ak_regions_3338 <- ak_regions %>%
+  st_transform(crs = 3338)
+
+st_crs(ak_regions_3338)
+```
+
+```{r}
+plot(ak_regions_3338)
+```
+## Coordinate Reference Systems (CRS)A CRS can be both unprojected and projected.Unprojected CRS aka a geographic coordinate system (GCS)- latitude and longitude references the earth as a 3D object
+- tells us *where* something is located on the globe
+- measured in angular units, i.e. degreesProjected CRS or projected coordinated system (PCS) or projection (for short)- latitude and longitude references the earth as a 2D object
+- tells us *how* to draw or create the representation on a flat surface
+- measured in linear units, i.e. meters
+
+## spatial joins
+
+determine number of ppl per region 
+
+```{r}
+pop <- read.csv("data/alaska_population.csv")
+class(pop) #create a class of type pop (CHECK AGAIN)
+```
+
+### make pop an sf object using 
+
+```{r}
+pop_4326 <- stat_as_sf(pop, #uses the function to transform coordinates
+                       coords = c("lng", "lat"),
+                       crs = 4326,
+                       remove = FALSE) #makes sure to retain original coordinates
+head(pop_4326)
+```
+
+```{r}
+pop_3338 <- st_transform(pop_4326, crs = 3338)
+
+pop_joined <- st_join(pop_3338, ak_regions_3338, join = st_within)
+
+head(pop_joined)
+```
+
+## calculate total population per region using 'groupby()'
+```{r}
+pop_region <- pop_joined %>% #we pipe in data from the joint earlier
+  as.data.frame() %>% #we turn this inpiped data into a dataframe
+  group_by(region) %>% 
+  summarise(total_pop = sum(population))
+
+head(pop_region)
+```
+
+```{r}
+plot(pop_region_3338)
+```
+
+```{r}
+pop_mgmt_3338 <- pop_region_3338 %>% 
+  group_by(mgmt_area) %>% 
+  summarize(total_pop = sum(total_pop), do_union = F)
+
+plot(pop_mgmt_3338["total_pop"])
+```
+
+##Writing spatial data as a file
+
+```{r}
+write_sf <- (pop_region_3338, "data/ak_regions_populations.shp", delete_layer = TRUE)
+
+#take this object pop_region_3338 we created earlier
+#the anaylsis should be written in the data file named in quotes here
+#default_layer: by default it doesnt allow you to overwrite it
+
+#there are options of tidyverse operations on sf objects
+
+```
+
+## visualizing, using ggplot
+
+```{r}
+ggplot(pop_region_3338) +
+  geom_sf(aes(fill = total_pop)) +
+  theme_bw() +
+  labs(fill = "Total Population") + #changes title of the legend
+  scale_fill_continuous(low = "khaki", high =  "firebrick", labels = comma) #specify exactly which kind of colours we want to use
+#the labels in the legend will be by columns
+```
+
+## visualize rivers in alaska
+plot all three shapefiles - the regional population (polygons), the locations of cities (points), and the rivers (linestrings)
+
+```{r}
+rivers_3338 <- read_sf("ak_rivers_simp.shp")
+#check output to see if it is in the right projection
+st_crs(rivers_3338)
+```
+```{r}
+ggplot() +
+  geom_sf(data = pop_region_3338, aes(fill = total_pop)) +
+  geom_sf(data = rivers_3338, aes(size = StrOrder), color = "black") + #size of the rivers is based on srorder
+  geom_sf(data = pop_3338, aes(), size = .5) +
+  scale_size(range = c(0.01, 0.2), guide = F) +
+  theme_bw() +
+  labs(fill = "Total Population") +
+  scale_fill_continuous(low = "khaki", high =  "firebrick", labels = comma)
+```
+## incorporate base maps into static maps
+
+```{r}
+pop_3857 <- pop_3338 %>% #pipe in basemap as tiles from other serves, e.g. google
+  st_transform(crs = 3857) 
+```
+
+#step 1 write the function to get a specific boxed area to work on
+```{r}
+# Define a function to fix the bbox to be in EPSG:3857
+# See https://github.com/dkahle/ggmap/issues/160#issuecomment-397055208
+ggmap_bbox_to_3857 <- function(map) {
+  if (!inherits(map, "ggmap")) stop("map must be a ggmap object")
+  # Extract the bounding box (in lat/lon) from the ggmap to a numeric vector, 
+  # and set the names to what sf::st_bbox expects:
+  map_bbox <- setNames(unlist(attr(map, "bb")), 
+                       c("ymin", "xmin", "ymax", "xmax"))
+  
+  # Coonvert the bbox to an sf polygon, transform it to 3857, 
+  # and convert back to a bbox (convoluted, but it works)
+  bbox_3857 <- st_bbox(st_transform(st_as_sfc(st_bbox(map_bbox, crs = 4326)), 3857))
+  
+  # Overwrite the bbox of the ggmap object with the transformed coordinates 
+  attr(map, "bb")$ll.lat <- bbox_3857["ymin"]
+  attr(map, "bb")$ll.lon <- bbox_3857["xmin"]
+  attr(map, "bb")$ur.lat <- bbox_3857["ymax"]
+  attr(map, "bb")$ur.lon <- bbox_3857["xmax"]
+  map
+}
+```
+
+#step 2 get baselayer from openstreetmaps
+```{r} 
+bbox <- c(-170, 52, -130, 64)   # This is roughly southern Alaska
+ak_map <- get_stamenmap(bbox, zoom = 4) #create object ak_map
+#get_stamenmap gets the baselayer in this box
+ak_map_3857 <- ggmap_bbox_to_3857(ak_map)
+```
+```{r}
+ggmap(ak_map_3857) + 
+  geom_sf(data = pop_3857, aes(color = population), inherit.aes = F) +
+  scale_color_continuous(low = "khaki", high =  "firebrick", labels = comma)
+```
+## create interactive maps with leaflet
+
+```{r}
+#leaflet projects data for us
+#shapefile that is unprojected has to be feeded into leaflet
+epsg3338 <- leaflet::leafletCRS( #we tell that we have a CRS projection system
+  crsClass = "L.Proj.CRS",
+  code = "EPSG:3338",
+  proj4def =  "+proj=aea +lat_1=55 +lat_2=65 +lat_0=50 +lon_0=-154 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs",
+  resolutions = 2^(16:7))
+```
+
+```{r}
+pop_region_4326 <- pop_region_3338 %>% st_transform(crs = 4326)
+#unprojected region
+```
+
